@@ -1,0 +1,12 @@
+A databricks runtime is a collection of libraries that will be installed on cluster.
+
+In Databricks a Spark application is created by default on the Cluster.
+One worker machine will only host one executor.
+
+shift + enter to execute a notebook.
+
+Using Spark on Azure Synapse Analytics.
+
+-- To create a new Spark pool go to Manage and create a new one.
+
+-- To add a new Synapse notebook go to the Develop tab.

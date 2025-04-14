@@ -1,0 +1,656 @@
+#Data Lake is a central repository to store all types of data at any scale , in the form of files.
+
+# How Spark writes to Data Lake ?
+
+We have a Spark cluster and a data lake .
+
+Job (process sales data)
+
+Spark will create a job divided into multiple , parallel tasks to write multiple, partitioned files parallely to the Data Lake folder.
+
+                        |-Task1-------------------------------> part-000.csv    } (partition files)
+                        |- Task2------------------------------> part-001.csv    }
+Job (process sales data)|- Task3------------------------------> part-002.csv    }DATA LAKE
+                        |-Task4-------------------------------->part-003.csv    }
+						
+#ACID guarantees on transactions.
+Atomicity - All or no changes are written .
+Consistency - Data always remains in valid state before and after the transaction.
+Isolation - Transaction must run isolated from other processes. Any data written by the writer should not be visible to the Reader till it is committed.
+Durability - Once committed , data persists even if system fails.
+
+Data Lakes does not provide ACID guarantees.
+In Spark overwrite is a 2 step process. Delete existing + write two new part files.
+
+Challenges with Data Lake.
+- Data corruption because of failures - no rollback.
+- No data validation while writing. So a column could be written as integer in one transaction and string in another.
+- Consistency issues while reading data.
+- Handling Batch and Streaming data together is tough.
+- No updates / deletes / merge on files.(Difficult to implement GDPR/CCPA compliance).
+- Data quality issues.- Schema isn't verified before writing.
+                      - Cannot apply checks on data (like in the databases)
+- Query performance issues.
+- Difficult to maintain historical versions of data.
+
+
+Delta Lake can help solve these challenges. Apache Iceberg and Apache Hudi that works similarly to Delta Lake.
+Delta Lake is an open source storage layer that brings reliability to Data Lakes.
+We need to deploy the Delta Lake component in Spark cluster.
+Data from a dataframe will be written using delta format and stored as Parquet files along with transaction log.
+
+Save Dataframe in Delta format.
+
+(
+dataframe
+   .write 
+   .format("delta") # like other formats - csv , parquet , etc.
+   .save (filepath)
+   
+)
+
+Suppose we want to store Customer data in delta format inside Customer folder. Spark will create a _delta_log subfolder where the transaction log will be stored.
+
+Write operation 1 (write 2 part files) - > part-000.parquet and part-001.parquet. Since we are creating in delta format Spark will also create a file called
+000.json that will be stored in the _delta_log subfolder and contain transaction log data.
+
+Write operation 2 (append 1 part file) part-002.parquet and 001.json in the  _delta_log subfolder.
+
+Write operation 3 (append 1 part file) part-003.parquet and 002.json in the  _delta_log subfolder.
+
+For each write operation part files are written first and then a transaction log file is added in json format to _delta_log folder.
+Transaction logs contain the details of every transaction that has been performed on the file.
+
+For each read operation first transaction log files are read and part files are then read based on log files.First each all log files - 000.json,001.json , 002.json
+and then read 4 part files based on log information. It contains information like operation and file name.
+For Update operation log file will contain 2 operations - Remove and add - Remove part1 and add part4.
+
+Delta Lake features - 
+Provides ACID guarantees 
+- No data corruption because of failures.
+- Data consistency while reading data.
+
+Perform inserts/updates/ deletes.
+
+Schema enforcement and evolution.
+
+Protect data using Time Travel.
+
+Handle batch & streaming data together.
+
+Apply data quality checks.
+
+Performance improvements using statistics.
+
+
+For Job failure in overwriting data existing files are not deleted in Delta format. Log files contains details of only complete and not 
+partial transactions.
+
+from pyspark.sql import SparkSession
+from pyspark.sql.types import *
+from pyspark.sql.functions import *
+
+spark = (
+             SparkSession
+			     .builder
+				 .appName("DeltaLakeApp")
+				 
+				 .master("local[4]")
+				 .config("spark.dynamicAllocation.enabled", "false")
+				 
+			#Add package for Delta Lake
+			     .config("spark.jars.packages", "io.delta:delta-core_2.12:2.2.0")
+				 
+			#Add settings to use Delta Lake with Spark session.	 
+				 
+		        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+				.config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+				.getOrCreate()
+				
+       )
+sc=spark.sparkContext
+
+spark
+				 
+#Create schema for Yellow taxi data.
+
+# Read Yellow Taxis file.
+
+yellowTaxiDF= (
+                spark
+				    .read
+					.option("header" , "true")
+					.schema(yellowTaxiSchema)
+					.csv("C:\SparkCourse\DataFiles\Raw\YellowTaxis_202210.csv")
+					
+			)
+			
+# Print Schema of DataFrame
+yellowTaxiDF.printSchema()
+
+
+# Create database in metastore
+spark.sql(""" 
+CREATE DATABASE IF NOT EXISTS TaxisDB
+""")
+
+# Parquet format : Save DataFrame as a Table.
+
+(
+    yellowTaxiDF
+	       .write
+		   .mode("overwrite")
+		   .partitionBy("VendorId")
+		   .format("parquet")
+		   .option("path", "C:\SparkCourse\DataFiles\Output\YellowTaxis.parquet")
+		   .saveAsTable("TaxisDB.YellowTaxisParquet")
+)
+
+#Delta format : Save DataFrame as a Table.
+
+from delta import *
+
+(
+    yellowTaxiDF
+	       .write
+		   .mode("overwrite")
+		   .partitionBy("VendorId")
+		   .format("delta")
+		   .option("path", "C:\SparkCourse\DataFiles\Output\YellowTaxis.delta")
+		   .saveAsTable("TaxisDB.YellowTaxis")
+)
+
+Open the path where data has been saved. In the output folder there are 2 folders - one for parquet and one for delta.
+
+# Audit history of delta tables.
+spark.sql(""" 
+DESCRIBE HISTORY TaxisDB.YellowTaxis
+""").show(truncate=False)
+
+
+Overwrite data in Delta table.
+
+# Overwrite data by rerunning the command.
+
+(
+    yellowTaxiDF
+	       .write
+		   .mode("overwrite")
+		   .partitionBy("VendorId")
+		   .format("delta")
+		   .option("path", "C:\SparkCourse\DataFiles\Output\YellowTaxis.delta")
+		   .saveAsTable("TaxisDB.YellowTaxis")
+)
+
+It will not replace the existing files. 
+
+
+Create table using DDL command and later add the data.
+
+spark.sql("""
+
+CREATE TABLE TaxisDB.yellowTaxis
+(
+
+VendorId               INT           COMMENT 'Vendor providing the ride' ,
+
+PickupTime             TIMESTAMP,
+DropTime               TIMESTAMP,
+
+PickupLocationID       INT               NOT NULL,
+DropLocationID         INT,
+
+PassengerCount         DOUBLE,
+TripDistance           DOUBLE,
+
+RateCodeId             DOUBLE,
+StoreAndFwdFlag        STRING,
+PaymentType            INT,
+
+FareAmount             DOUBLE,
+Extra                  DOUBLE,
+MtaTax                 DOUBLE,
+TipAmount              DOUBLE,
+TollsAmount            DOUBLE,
+ImprovementSurcharge   DOUBLE,
+TotalAmount            DOUBLE,
+CongestionSurcharge    DOUBLE,
+AirportFee             DOUBLE
+
+)
+
+USING DELTA           -- default is Parquet
+LOCATION "C:/SparkCourse/DataFiles/Output/YellowTaxis.delta/"
+
+PARTITIONED BY (VendorId)  --optional
+
+COMMENT 'This table stores ride information for Yellow Taxis'
+
+""")
+
+spark.sql("""
+DESCRIBE TABLE EXTENDED TaxisDB.YellowTaxis
+""").show(50, truncate=False)
+
+Inserting data to Delta table.
+
+spark.sql("""
+
+SELECT *
+FROM TaxisDB.YellowTaxis
+
+""").show()
+
+#Check the transaction log.
+
+spark.sql("""
+DESCRIBE HISTORY TaxisDB.YellowTaxis
+""").show(truncate=False)
+
+# Append to data Lake in delta format.
+
+(
+
+yellowTaxiDF
+    .write
+	
+	.mode("append")
+	
+	.partitionBy("VendorId")
+	.format("delta")
+	.save("C:\SparkCourse\DataFiles\Output\YellowTaxis.delta")
+)
+
+Check the count .
+
+spark.sql("""
+
+SELECT COUNT(1) 
+FROM TaxisDB.YellowTaxis
+
+""").show()
+
+Performing DML operations.
+----------------------------------------------------------------
+
+#Run update , delete and merge on Delta tables.
+
+Check files holding the data.
+
+spark.sql("""
+
+SELECT INPUT_FILE_NAME()
+
+       ,VendorId
+	   ,PickupLocationID
+	   ,PassengerCount
+	   
+FROM TaxisDB.YellowTaxis
+
+WHERE VendorId = 3
+
+""").show(truncate=False)
+
+
+#Run UPDATE statement to change passenger count.
+
+spark.sql("""
+
+UPDATE TaxisDB.YellowTaxis
+
+SET PassengerCount = 2
+
+WHERE VendorId = 3
+     AND PickupLocationID = 249
+	 
+""").show()
+
+# Check passenger count after update.
+
+spark.sql("""
+
+SELECT VendorId
+     , PickupLocationID
+	 , PassengerCount
+	 
+FROM TaxisDB.YellowTaxis
+
+WHERE VendorId = 3
+      AND PickupLocationID = 249
+
+""").show()
+
+
+spark.sql("""
+
+DESCRIBE HISTORY TaxisDB.YellowTaxis
+
+""").show(truncate=False)
+
+
+DELETE command
+
+#check if record exists
+
+spark.sql("""
+
+SELECT VendorId
+     , PickupLocationID
+	 , PassengerCount
+	 
+FROM TaxisDB.YellowTaxis
+
+WHERE VendorId = 3
+      AND PickupLocationID = 151
+	  
+""").show()
+
+# Delete the record.
+
+spark.sql("""
+
+DELETE FROM TaxisDB.YellowTaxis
+
+WHERE VendorId = 3
+      AND PickupLocationID = 151
+
+""").show()
+
+#Verify
+
+spark.sql("""
+
+SELECT VendorId
+     , PickupLocationID
+	 , PassengerCount
+	 
+FROM TaxisDB.YellowTaxis
+
+WHERE VendorId = 3
+      AND PickupLocationID = 151
+	  
+""").show()
+
+
+# Check transaction log.
+
+spark.sql("""
+
+DESCRIBE HISTORY TaxisDB.YellowTaxis
+
+""").show(truncate=False)
+
+
+MERGE command
+
+#Extract changed records from Storage/Data Lake.
+
+yellowTaxiChangesDF = (
+                        spark
+						  .read
+						  .option ("header", "true")
+						  .schema(yellowTaxiSchema)
+						  .csv("C:\SparkCourse\DataFiles\Raw\YellowTaxis_changes.csv")
+				    )
+						  
+yellowTaxiChangesDF.show()
+
+
+yellowTaxiChangesDF.createOrReplaceTempView("YellowTaxiChanges")
+
+spark.sql("""
+
+SELECT *
+FROM YellowTaxiChanges
+
+""").show()
+
+
+spark.sql("""
+
+MERGE INTO TaxisDB.YellowTaxis tgt
+
+    USING YellowTaxiChanges    src
+	
+	   ON tgt.VendorId = src.VendorId
+	    AND tgt.PickupLocationID = src.PickupLocationID
+		
+-- update row if join conditions match
+
+WHEN MATCHED 
+
+   THEN 
+       UPDATE SET tgt.PaymentType = src.PaymentType 
+	   
+	                                    -- Use 'UPDATE SET *' to update all columns
+										
+-- Insert row if row is not present in target table
+WHEN NOT MATCHED 
+     AND PickupTime >= '2022-03-01'
+
+        THEN 
+		    INSERT (VendorId , PickupTime, DropTime,PickupLocationID,DropLocationID,PassengerCount,RateCodeId,StoreAndFwdFlag,PaymentType,FareAmount,
+			        Extra,MtaTax,TipAmount,ImprovementSurcharge,TotalAmount,CongestionSurcharge,AirportFee)
+					
+		    VALUES (VendorId , PickupTime, DropTime,PickupLocationID,DropLocationID,PassengerCount,RateCodeId,StoreAndFwdFlag,PaymentType,FareAmount,
+			        Extra,MtaTax,TipAmount,ImprovementSurcharge,TotalAmount,CongestionSurcharge,AirportFee)
+					
+					
+""").show()
+     
+    
+TABLE CONSTRAINTS (Constraints on Delta Table)
+
+-- NOT NULL and CHECK
+
+-- Define NOT NULL constraint on column to avoid insertion of null values.
+
+-- Drop the constraint here which was previously created.
+
+spark.sql("""
+
+ALTER TABLE TaxisDB.YellowTaxis
+           CHANGE COLUMN PickupLocationID DROP NOT NULL
+""").show()
+
+
+# At the time of recording , Open Issue: https://github.com/delta-io/delta/issues/831
+# Does not allow to set column as null after table creation.
+
+#Check the transaction log.
+
+
+spark.sql("""
+
+DESCRIBE HISTORY TaxisDB.YellowTaxis
+
+""").show(truncate=False)
+
+
+CHECK constraint
+
+spark.sql("""
+
+ALTER TABLE TaxisDB.YellowTaxis
+
+      ADD CONSTRAINT PassengerCountCheck CHECK (PassengerCount <= 5)
+	  
+""").show()
+
+
+# It will throw exception as the table has passenger count already more than 5.
+
+spark.sql("""
+
+ALTER TABLE TaxisDB.YellowTaxis
+
+      ADD CONSTRAINT PassengerCountCheck CHECK (PassengerCount <= 9 OR PassengerCount IS NULL)
+	  
+""")
+
+# Verify by trying to insert passenger count = 20.
+
+
+spark.sql("""
+
+INSERT INTO TaxisDB.YellowTaxis
+		    --VendorId , PickupTime, DropTime,PickupLocationID,DropLocationID,PassengerCount,RateCodeId,StoreAndFwdFlag,PaymentType,FareAmount,
+			        --Extra,MtaTax,TipAmount,ImprovementSurcharge,TotalAmount,CongestionSurcharge,AirportFee
+
+VALUES (3 , '2022-12-01T00:00:00.000Z' , '2022-12-01T00:15:34.000Z' , 170 , 140,
+                  
+	    20 --PassengerCount
+       
+        2.9, 1.0, '1', 1, 13.0 , 0.5 , 0.5 , 1.0 , 0.0 , 0.3 , 15.3 , 0.0, 0.0)
+
+""")
+
+#DROP CONSTRAINT
+
+spark.sql("""
+
+ALTER TABLE TaxisDB.YellowTaxis
+
+      DROP CONSTRAINT PassengerCheck
+	  
+""")		
+
+# CHECK LOG
+
+spark.sql("""
+
+DESCRIBE HISTORY TaxisDB.YellowTaxis
+
+""").show(truncate=False)
+
+
+ACCESSING DATA WITH TIME TRAVEL.
+
+CUSTOMERS (folder)                     _delta_log (subfolder)
+                        
+part000.parquet                          000.json(10:00AM)  |   Reads Version 1
+part001.parquet                                             |
+                                                            |
+part002.parquet                          001.json(10:10AM)  |
+part003.parquet                          002.json(10:20AM)  |
+
+
+SELECT *
+
+FROM CUSTOMERS VERSION AS OF 1
+
+
+SELECT *
+
+FROM CUSTOMERS TIMESTAMP AS OF '2022-03-01 10:05'
+
+TimeTravel allows to access / restore previous snapshot of data , even if data has been modified or deleted.
+
+Update a record .
+
+# Check passenger count before update.
+
+spark.sql("""
+
+SELECT PassengerCount
+
+FROM TaxisDB.YellowTaxis
+
+WHERE VendorId = 3 
+      AND PickupLocationID = 1
+""").show()
+
+
+#Update passenger count.
+
+
+spark.sql("""
+
+UPDATE TaxisDB.YellowTaxis
+
+SET PassengerCount = 1
+
+WHERE VendorId = 3
+     AND PickupLocationID = 1
+	 
+""").show()
+
+# Check table history.
+
+
+spark.sql("""
+
+DESCRIBE HISTORY TaxisDB.YellowTaxis
+
+""").show(truncate=False)
+
+
+#TimeTravel: Access using version number.
+
+#Check at initial version
+
+spark.sql("""
+
+SELECT PassengerCount
+
+FROM TaxisDB.YellowTaxis   VERSION AS OF 0
+
+WHERE VendorId = 3 
+      AND PickupLocationID = 1
+""").show()
+
+
+# Check at one prior version.
+
+spark.sql("""
+
+SELECT PassengerCount
+
+FROM TaxisDB.YellowTaxis   VERSION AS OF 9
+
+WHERE VendorId = 3 
+      AND PickupLocationID = 1
+""").show()
+
+#TimeTravel: Access using Timestamp.
+
+spark.sql("""
+
+SELECT PassengerCount
+
+FROM TaxisDB.YellowTaxis   TIMESTAMP AS OF '2023-03-12 22:39:00'
+
+WHERE VendorId = 3 
+      AND PickupLocationID = 1
+	  
+""").show(truncate=False)
+
+# Restore table to older version.
+
+spark.sql("""
+
+RESTORE TABLE TaxisDB.YellowTaxis  TO VERSION AS OF 9 
+
+""").show(truncate=False)
+
+
+# Check log.
+
+spark.sql("""
+
+DESCRIBE HISTORY TaxisDB.YellowTaxis
+
+""").show(truncate=False)
+
+# Check data after restore
+
+spark.sql("""
+
+SELECT PassengerCount
+
+FROM TaxisDB.YellowTaxis
+
+WHERE VendorId = 3 
+      AND PickupLocationID = 1
+	  
+""").show()
