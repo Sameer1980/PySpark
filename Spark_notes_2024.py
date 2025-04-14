@@ -130,6 +130,16 @@ spark=(SparkSession\
          )
 spark
 
+SparkSession.builder() – Return SparkSession.Builder class. This is a builder for SparkSession. master(), appName(), and getOrCreate() are methods of SparkSession.Builder.
+
+master() – This allows Spark applications to connect and run in different modes (local, standalone cluster, Mesos, YARN), depending on the configuration.
+
+Use local[x] when running on your local laptop. x should be an integer value and should be greater than 0; this represents how many partitions it should create when using RDD, DataFrame, and Dataset. Ideally, x value should be the number of CPU cores you have.
+For standalone use spark://master:7077
+appName() – Sets a name to the Spark application that shows in the Spark web UI. If no application name is set, it sets a random name.
+
+getOrCreate() – This returns a SparkSession object if it already exists. Creates a new one if it does not exist.
+
 # TO CHECK:
 ------------
 
