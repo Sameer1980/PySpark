@@ -16,6 +16,10 @@ df = df.withColumn("total_marks", lit(120))
 
 df = df.withColumn("average", (col("marks") / col ("total_marks"))*100 )
 
+from pyspark.sql.functions import col , round
+
+student_df = student_df.withColumn("average",round((col("marks") / col("total_marks")) * 100))
+
 # COMMAND ----------
 
 df_OOP = df.filter((df.course == "OOP") & (df.average > 80))
