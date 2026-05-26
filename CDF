@@ -1,0 +1,49 @@
+# Create a Delta table with Change Data Capture (CDC) enabled
+
+(vehicles_df
+    .withColumnRenamed("SL No. ", "SL_No")
+    .write
+    .mode("overwrite")
+    .option("delta.enableChangeDataFeed", "true")
+    .format("delta")
+    .saveAsTable("my_catalog.new_schema.vehicles_cdc")
+)
+
+# To verify CDC is enabled
+display(spark.sql("DESCRIBE DETAIL my_catalog.new_schema.vehicles_cdc"))
+
+spark.sql("select * from my_catalog.new_schema.vehicles_cdc").show()
+
+
+CREATE TABLE TaxisDB.PaymentTypes
+(
+
+      PaymentTypeId         INT,
+	  PaymentTypeName       STRING,
+	  IsEnabled             INT
+	  
+)
+
+USING DELTA 
+TBLPROPERTIES (delta.enableChangeDataFeed = true );
+
+INSERT INTO TaxisDB.PaymentTypes (PaymentTypeId , PaymentTypeName , IsEnabled )
+VALUES (1, 'Credit Card' , 1);
+
+INSERT INTO TaxisDB.PaymentTypes (PaymentTypeId , PaymentTypeName , IsEnabled )
+VALUES (2, 'Cash' , 1);
+
+DESCRIBE HISTORY TaxisDB.PaymentTypes ;
+
+SELECT * FROM table_changes ('TaxisDB.PaymentTypes', 3);
+
+UPDATE TaxisDB.PaymentTypes
+SET IsEnabled = 0
+WHERE PaymentTypeId=2 ;
+
+DELETE FROM TaxisDB.PaymentTypes
+WHERE PaymentTypeId = 1;
+
+SELECT * 
+FROM table_changes ('TaxisDB.PaymentTypes' , 3, 4) ORDER BY _commit_timestamp ;
+
