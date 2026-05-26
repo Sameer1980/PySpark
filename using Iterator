@@ -1,0 +1,7 @@
+localitr = df.toLocalIterator()
+print (type(localitr))
+for rec in localitr:
+    if rec["region"] == 'Asia':
+        row = rec
+        print (row)
+
