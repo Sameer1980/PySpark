@@ -1,0 +1,11 @@
+# Using local temporary view 
+
+df.createOrReplaceTempView("temp_df")
+sql_query = """ 
+select category , product , amount ,
+row_number() over (partition by category order by amount desc) AS rank from temp_df 
+qualify rank <= 3
+"""
+
+result_df = spark.sql(sql_query)
+result_df.show()
