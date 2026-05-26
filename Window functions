@@ -29,3 +29,17 @@ ranked_df = df.withColumn("rank",row_number().over(window_spec))
 result_df = ranked_df.filter(col("rank") <= 3)
 
 result_df.show()
+import pyspark.sql.functions as F
+from pyspark.sql import Window
+
+#Define Window specification
+window_spec = Window.partitionBy("category").orderBy(F.col("amount").desc())
+
+#Add row number 
+ranked_df = ranked_df.withColumn("rank",F.row_number().over(window_spec))
+
+#Filter top 3 records per category
+
+result_df = ranked_df.filter(F.col("rank") <= 3)
+
+result_df.show()
