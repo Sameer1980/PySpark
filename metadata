@@ -1,0 +1,5 @@
+spark.sql("""
+          DESCRIBE HISTORY my_catalog.new_schema.vehicles
+          """).show(truncate = False)
+
+  display(spark.sql("DESCRIBE DETAIL my_catalog.new_schema.vehicles_cdc"))
