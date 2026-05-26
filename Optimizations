@@ -1,0 +1,23 @@
+from pyspark.sql import SparkSession
+import pandas as pd
+
+spark = SparkSession.builder.appName("collect_demo").getOrCreate()
+
+# Create a 5GB DataFrame (1B rows)
+data = spark.range(0, 1_000_000_000).withColumn("value", F.rand() * 1000)
+
+# BAD: Crashes driver with OOM
+# all_data = data.collect()  # Never do this on large data
+
+# GOOD: Sample with .take()
+sample = data.take(10)  # Pulls only 10 rows to driver
+print(f"Sample rows: {sample}")
+
+# GOOD: Process row-by-row with .toLocalIterator()
+# Memory-efficient for large datasets that must be processed in Python
+row_count = 0
+for row in data.toLocalIterator():
+    row_count += 1
+    if row_count % 10_000_000 == 0:
+        print(f"Processed {row_count} rows")
+        break  # Early exit possible
