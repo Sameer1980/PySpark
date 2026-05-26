@@ -1,0 +1,31 @@
+data = [("A","p1",100),
+        ("A","p2",200),
+        ("A","p3",200),
+        ("B", "p4",300),
+        ("B", "p5", 150),
+        ("B", "p6", 150),
+        ("C","p7",400),
+        ("C","p8",300),
+        ("C","p9",200)
+        ]
+
+columns = ["category", "product", "amount"]
+df = spark.createDataFrame(data,columns)
+df.show()
+df.printSchema()
+
+from pyspark.sql import Window
+from pyspark.sql.functions import col , row_number
+
+#Define Window specification
+window_spec = Window.partitionBy("category").orderBy(col("amount").desc(), col("product").asc())
+#print(window_spec)
+
+# Add row_number column
+ranked_df = df.withColumn("rank",row_number().over(window_spec))
+
+#Filter top 3 records per category
+
+result_df = ranked_df.filter(col("rank") <= 3)
+
+result_df.show()
