@@ -1,0 +1,40 @@
+(vehicles_df
+    .withColumnRenamed("SL No. ", "SL_No")
+    .write
+    .mode("overwrite")
+    .partitionBy("region")
+    .format("delta")
+    .saveAsTable("my_catalog.new_schema.vehicles")
+)
+
+spark.sql("select * from my_catalog.new_schema.vehicles").show()
+
+(vehicles_df
+    .withColumnRenamed("SL No. ", "SL_No")
+    .write
+    .mode("overwrite")
+    .format("parquet")
+    .save("/Volumes/my_catalog/new_schema/my_volume/sample_data.parquet")
+)
+(vehicles_df
+    .withColumnRenamed("SL No. ", "SL_No")
+    .write
+    .mode("overwrite")
+    .format("delta")
+    .save("/Volumes/my_catalog/new_schema/my_volume/sample_data.delta")
+)
+
+new_veh_df = spark.read.options(header = 'True', inferSchema = 'True').csv("/Volumes/my_catalog/new_schema/my_volume/new_veh_data.csv")
+
+#new_veh_df.show()
+
+(new_veh_df
+    .withColumnRenamed("SL No. ", "SL_No")
+    .write
+    .mode("append")
+    .format("delta")
+    .saveAsTable("my_catalog.new_schema.vehicles")
+)
+
+spark.sql("select * from my_catalog.new_schema.vehicles").show()
+#display(spark.sql("select * from my_catalog.new_schema.vehicles"))
