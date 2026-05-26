@@ -1,0 +1,19 @@
+(
+    new_df
+    .withColumnRenamed("SL NO. ","SL_NO")
+    .write
+    .format("delta")
+    .mode("append")
+    .option("mergeSchema", "true")
+    .saveAsTable("my_catalog.new_schema.vehicles")
+
+)
+
+(new_df
+    .withColumnRenamed("SL No. ", "SL_No")
+    .write
+    .mode("append")
+    .format("delta")
+    .option("mergeSchema", True)
+    .save("/Volumes/my_catalog/new_schema/my_volume/sample_data.delta")
+)
