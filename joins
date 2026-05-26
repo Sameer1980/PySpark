@@ -1,0 +1,64 @@
+# Create two DataFrames for demonstrating different join types
+
+# DataFrame 1: Employees (7 rows - 4 matching, 3 non-matching)
+employees_data = [
+    (101, "Alice", 1),
+    (102, "Bob", 2),
+    (103, "Charlie", 3),
+    (104, "David", 4),
+    (105, "Eve", 11),      # Non-matching dept_id
+    (106, "Frank", 12),    # Non-matching dept_id
+    (107, "Grace", 13)     # Non-matching dept_id
+]
+df_employees = spark.createDataFrame(employees_data, ["emp_id", "emp_name", "dept_id"])
+
+print("=== Employees DataFrame (7 rows - 4 matching, 3 non-matching) ===")
+df_employees.show()
+
+# DataFrame 2: Departments (10 rows, only dept_id 1-4 match)
+departments_data = [
+    (1, "Engineering", "New York"),
+    (2, "Sales", "Chicago"),
+    (3, "Marketing", "Los Angeles"),
+    (4, "HR", "Boston"),
+    (5, "Finance", "Seattle"),
+    (6, "Operations", "Austin"),
+    (7, "IT Support", "Denver"),
+    (8, "Legal", "San Francisco"),
+    (9, "Research", "Portland"),
+    (10, "Customer Service", "Miami")
+]
+df_departments = spark.createDataFrame(departments_data, ["dept_id", "dept_name", "location"])
+
+print("\n=== Departments DataFrame (10 rows) ===")
+df_departments.show()
+
+print("\n=== JOIN DEMONSTRATIONS ===")
+
+# INNER JOIN - Only matching rows (4 rows)
+print("\n1. INNER JOIN (4 matching rows):")
+df_employees.join(df_departments, "dept_id", "inner").show()
+
+# LEFT JOIN - All from left + matches from right (7 rows)
+print("\n2. LEFT JOIN (all 7 employees + matching departments):")
+df_employees.join(df_departments, "dept_id", "left").show()
+
+# RIGHT JOIN - All from right + matches from left (10 rows)
+print("\n3. RIGHT JOIN (all 10 departments + matching employees):")
+df_employees.join(df_departments, "dept_id", "right").show()
+
+# FULL OUTER JOIN - All rows from both (13 rows)
+print("\n4. FULL OUTER JOIN (all rows from both DataFrames):")
+df_employees.join(df_departments, "dept_id", "outer").show()
+
+# LEFT ANTI JOIN - Rows in left without match in right (3 rows)
+print("\n5. LEFT ANTI JOIN (employees without departments):")
+df_employees.join(df_departments, "dept_id", "left_anti").show()
+
+# LEFT SEMI JOIN - Rows in left with match in right (4 rows)
+print("\n6. LEFT SEMI JOIN (employees with departments):")
+df_employees.join(df_departments, "dept_id", "left_semi").show()
+
+# RIGHT ANTI JOIN - Rows in right without match in left (6 rows)
+print("\n7. RIGHT ANTI JOIN (departments without employees):")
+df_departments.join(df_employees, "dept_id", "left_anti").show()
