@@ -1,0 +1,12 @@
+#df.show()
+
+data_collect = df.collect()
+
+print (type(data_collect))
+
+#print (data_collect)
+
+for rec in data_collect:
+    if rec["region"] == "Asia":
+        row = rec
+        print (row)
