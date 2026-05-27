@@ -62,3 +62,62 @@ df_employees.join(df_departments, "dept_id", "left_semi").show()
 # RIGHT ANTI JOIN - Rows in right without match in left (6 rows)
 print("\n7. RIGHT ANTI JOIN (departments without employees):")
 df_departments.join(df_employees, "dept_id", "left_anti").show()
+
+
+# Create two DataFrames with specific matching pattern:
+# Left: 2 rows (1 matching, 1 non-matching)
+# Right: 10 rows (all match with 1 row from left)
+
+# DataFrame 1: Customers (2 rows)
+customers_data = [
+    (1, "Alice", "Premium"),    # This customer_id will match all orders
+    (99, "Bob", "Standard")     # This customer_id will NOT match any orders
+]
+df_customers = spark.createDataFrame(customers_data, ["customer_id", "customer_name", "tier"])
+
+print("=== Customers DataFrame (2 rows) ===")
+df_customers.show()
+
+# DataFrame 2: Orders (10 rows - all for customer_id = 1)
+orders_data = [
+    (1, 101, 250.00, "2026-01-15"),
+    (1, 102, 450.00, "2026-01-20"),
+    (1, 103, 150.00, "2026-02-01"),
+    (1, 104, 320.00, "2026-02-10"),
+    (1, 105, 500.00, "2026-03-05"),
+    (1, 106, 275.00, "2026-03-12"),
+    (1, 107, 400.00, "2026-04-01"),
+    (1, 108, 180.00, "2026-04-15"),
+    (1, 109, 350.00, "2026-05-01"),
+    (1, 110, 290.00, "2026-05-10")
+]
+df_orders = spark.createDataFrame(orders_data, ["customer_id", "order_id", "amount", "order_date"])
+
+print("\n=== Orders DataFrame (10 rows - all for customer_id = 1) ===")
+df_orders.show()
+
+print("\n=== JOIN DEMONSTRATIONS ===")
+
+# INNER JOIN - Only matching rows (10 rows - all orders match Alice)
+print("\n1. INNER JOIN (10 rows - Alice with all her orders):")
+df_customers.join(df_orders, "customer_id", "inner").show()
+
+# LEFT JOIN - All from left + matches from right (11 rows)
+print("\n2. LEFT JOIN (11 rows - Alice with 10 orders + Bob with NULLs):")
+df_customers.join(df_orders, "customer_id", "left").show()
+
+# RIGHT JOIN - All from right + matches from left (10 rows)
+print("\n3. RIGHT JOIN (10 rows - all orders with Alice):")
+df_customers.join(df_orders, "customer_id", "right").show()
+
+# LEFT SEMI JOIN - Customers who have orders (1 row - only Alice)
+print("\n4. LEFT SEMI JOIN (1 row - only Alice, no order details):")
+df_customers.join(df_orders, "customer_id", "leftsemi").show()
+
+# LEFT ANTI JOIN - Customers without orders (1 row - only Bob)
+print("\n5. LEFT ANTI JOIN (1 row - Bob has no orders):")
+df_customers.join(df_orders, "customer_id", "leftanti").show()
+
+print("\n=== KEY DIFFERENCE: LEFT SEMI vs INNER JOIN ===")
+print("LEFT SEMI JOIN returns 1 row (just Alice - no duplicates, no order columns)")
+print("INNER JOIN returns 10 rows (Alice repeated for each order with full details)")
