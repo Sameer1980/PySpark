@@ -32,5 +32,10 @@ name_df = student_df.filter(F.col("name").contains("se"))
 
 student_df.filter(F.col("name").like("Sher%")).distinct().show()
 
+# Method 3: Using contains() function while filtering (partial match)
+sheryll_df_contains = student_df.filter(F.col("name").contains("Sheryll Towler")).dropDuplicates(["name"])
+print("\n=== Method 3: Using contains() function with dropDuplicates on name column ===")
+sheryll_df_contains.show(truncate=False)
+
 
 
