@@ -1,0 +1,36 @@
+from pyspark.sql import Window
+
+student_df = student_df.withColumn("total_marks",F.lit(120))
+
+#student_df.show()
+
+average_marks = student_df.withColumn("average_marks" , F.round(F.col("marks") / F.col("total_marks")* 100))
+#average_marks.show()
+
+course_OOP = average_marks.filter((F.col("course") == 'OOP') & (F.col("average_marks") > 80))
+#course_OOP.show()
+
+course_Cloud = average_marks.filter(" course == 'Cloud' AND average_marks > 80 ")
+
+#course_Cloud.show()
+
+student_df.filter(F.col("course").isin(['OOP','DSA'])).groupBy("course").count().show()
+
+
+DSA_students = student_df.filter(F.col("course").startswith('DS'))
+windows_spec = Window.partitionBy("course").orderBy(F.lit(0))
+DSA_students = DSA_students.withColumn("row_number",F.row_number().over (windows_spec))
+#DSA_students.show(200)
+#display(student_df.filter(F.col("course").endswith('OP')))
+
+OOP_students = student_df.filter(F.col("course").endswith('OP'))
+OOP_students = OOP_students.withColumn("row_number",F.row_number().over(windows_spec))
+#OOP_students.show(200)
+
+name_df = student_df.filter(F.col("name").contains("se"))
+#name_df.show()
+
+student_df.filter(F.col("name").like("Sher%")).distinct().show()
+
+
+
