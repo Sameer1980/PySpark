@@ -1,0 +1,16 @@
+import pyspark.sql.functions as F
+#student_df.show()
+#student_df.select("name","gender","age","email").show(truncate = False)
+
+#Using bitwise operators
+new_df = student_df.select("name","gender","age","email","course").filter((F.col("gender") == "Female") & (F.col("course") == "DB"))
+
+new_df.show(truncate = False)
+
+#Using SQL style strings
+new_df_and = student_df.select ("name","gender","age","course").filter("gender == 'Female' AND course == 'DB' ")
+
+new_df_and.show(truncate = False)
+
+new_df_OR = student_df.select ("name","gender","age","course").filter("gender == 'Female' OR course == 'DB' ")
+#new_df_OR.show()
