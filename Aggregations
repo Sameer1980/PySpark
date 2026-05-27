@@ -1,0 +1,18 @@
+import pyspark.sql.functions as F
+
+student_df = spark.read.format("csv").options(header = True, inferSchema = True).load("/Volumes/my_catalog/new_schema/my_volume/StudentData.csv")
+
+student_df.show()
+
+grouped_df = student_df.groupBy("course").count().show()
+print (type(grouped_df))
+#grouped_df.show()
+
+grouped_df = student_df.groupBy("course","gender").agg(F.count("*").alias("Total_enrollment"))
+print (type(grouped_df))
+grouped_df.show()
+
+grouped_df_2 = student_df.groupBy("course","age").agg(F.min("marks").alias("min_marks"),F.max("marks").alias("max_marks"),F.round(F.avg("marks")).alias("avg_marks"))
+
+grouped_df_2.show()
+
