@@ -1,0 +1,19 @@
+df = spark.read.option("multiLine", True).json("/Volumes/my_catalog/new_schema/my_volume/customers.json")
+df.show()
+
+# Read all JSON files in a directory
+df = spark.read.option("multiLine", True).json("path/to/directory/*.json")
+
+# Read a specific list of files
+df = spark.read.option("multiLine", True).json(["file1.json", "file2.json"])
+
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+
+# Define schema structure
+schema = StructType([
+    StructField("name", StringType(), True),
+    StructField("age", IntegerType(), True)
+])
+
+# Read JSON applying the defined schema
+df = spark.read.schema(schema).json("path/to/file.json")
